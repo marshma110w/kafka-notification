@@ -1,6 +1,10 @@
 from flask import Flask, request, jsonify
 from db_config import DB_CONFIG
 import psycopg2
+import uuid
+import json
+from datetime import datetime
+from datetime import timezone
 
 app = Flask(__name__)
 conn = psycopg2.connect(**DB_CONFIG)
@@ -20,23 +24,41 @@ def add_employee():
             return jsonify({"error": f"Missing field: {field}"}), 400
 
     try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO employee (name, department, notification_type, email)
-                VALUES (%s, %s, %s, %s)
-                RETURNING id
-            """, (
-                data['name'],
-                data['department'],
-                data['notification_type'],
-                data['email']
-            ))
-            employee_id = cur.fetchone()[0]
-            conn.commit()
-            return jsonify({
-                "message": "Employee added successfully",
-                "id": employee_id
-            }), 201
+        with conn: 
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO employee (name, department, notification_type, email)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    data['name'],
+                    data['department'],
+                    data['notification_type'],
+                    data['email']
+                ))
+                employee_id = cur.fetchone()[0]
+                
+                event_id = str(uuid.uuid4())
+                event_type = "EmployeeCreated"
+                event_data = json.dumps({
+                    'employee_id': employee_id,
+                    'name': data['name'],
+                    'department': data['department'],
+                    'email': data['email'],
+                    'notification_type': data['notification_type'],
+                    'created_at': datetime.now(timezone.utc).isoformat(),
+                })
+                
+                cur.execute("""
+                    INSERT INTO outbox_events (id, type, created_at, data, processed)
+                    VALUES (%s, %s, NOW(), %s, FALSE)         
+                """, (event_id, event_type, event_data))
+                
+        return jsonify({
+            "message": "Employee added successfully",
+            "id": employee_id
+        }), 201
+        
     except Exception as e:
         conn.rollback()
         return jsonify({"error": str(e)}), 500

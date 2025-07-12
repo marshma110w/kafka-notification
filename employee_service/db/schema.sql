@@ -7,3 +7,13 @@ CREATE TABLE employee (
     notification_type VARCHAR(128) NOT NULL,
     email VARCHAR(128) NOT NULL
 );
+
+DROP TABLE IF EXISTS outbox_events;
+
+CREATE TABLE outbox_events (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL,
+    type VARCHAR(128) NOT NULL,
+    data JSONB NOT NULL,
+    processed BOOLEAN DEFAULT FALSE
+);
