@@ -41,6 +41,33 @@ def add_employee():
         conn.rollback()
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/employees', methods=['GET'])
+def get_employees():
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, name, department, notification_type, email
+                FROM employee
+            """)
+            employees = cur.fetchall()
+        
+        # Формируем список сотрудников в формате JSON
+        result = [
+            {
+                "id": emp[0],
+                "name": emp[1],
+                "department": emp[2],
+                "notification_type": emp[3],
+                "email": emp[4]
+            } for emp in employees
+        ]
+        
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+            
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-    
